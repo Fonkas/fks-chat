@@ -1,0 +1,12 @@
+# editors / OS
+.vscode/
+.idea/
+*.code-workspace
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# logs / temporary files
+*.log
+*.tmp
+*.bak
