@@ -1,17 +1,17 @@
 Config = {}
 
 -- Server console: "up to date" / "OUTDATED" compared with the version in fxmanifest.lua on GitHub,
--- and a warning (with the download link) when fks-utils (required) is not running
+-- and a warning (with the download link) when fks-core (required) is not running
 Config.VersionCheck = {
     enabled  = true,
     repo     = 'Fonkas/fks-chat',      -- GitHub "user/repository"
     branch   = 'main',
     interval = 12,                     -- check again every X hours (0 = only on start)
-    utilsUrl = 'https://github.com/Fonkas/fks-utils',
+    coreUrl = 'https://github.com/Fonkas/fks-core',
 }
 
 -- Language: 'pt' | 'en' (files in locales/; missing keys fall back to English)
-Config.Locale = 'pt'
+Config.Locale = 'en'
 
 -- Framework: 'auto' | 'vorp' | 'rsg'
 Config.Framework = 'auto'

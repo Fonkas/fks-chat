@@ -43,7 +43,7 @@ CreateThread(function()
         if changed then
             local list = {}
             for sid, name in pairs(tags) do list[#list + 1] = { sid = sid, name = name } end
-            SendUI('3d:tags', list)
+            SendUI('3d:tags', { list = list })
         end
         Wait(300)
     end
@@ -78,12 +78,12 @@ CreateThread(function()
                     end
                 end
             end
-            SendUILive('3d:pos', out)
+            SendUILive('3d:pos', { list = out })
             lastSent = #out > 0
             Wait(0)
         else
             if lastSent then
-                SendUILive('3d:pos', {})
+                SendUILive('3d:pos', { list = {} })
                 lastSent = false
             end
             Wait(250)

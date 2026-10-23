@@ -15,15 +15,14 @@ Chat, roleplay commands, admin mode and reports for **RedM** - works with **RSG*
 
 It **replaces the default `chat` resource** (`provide 'chat'`): `chat:addMessage`, `chat:addSuggestion(s)`,
 `chat:removeSuggestion`, `chat:clear`, `chatMessage` and `exports.chat:addMessage` keep working, so the other
-scripts do not need changes. Every registered command (for example `/items` from fks-utils) works from the chat.
+scripts do not need changes. Every registered command (for example `/items` from fks-core) works from the chat.
 
 ## Installation
 
 ```cfg
-ensure ox_lib
-ensure oxmysql
+ensure oxmysql         # needed by fks-core
 ensure vorp_core        # or rsg-core
-ensure fks-utils        # before the FKS scripts
+ensure fks-core        # 2.1.0+, before the FKS scripts (it also draws the chat)
 ensure fks-chat
 ```
 

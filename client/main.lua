@@ -1,45 +1,26 @@
 ---------------------------------------------------------------------------
--- NUI bridge: messages sent before the page is ready are queued
+-- The chat is drawn inside the fks-core NUI: ui/chat.js + ui/chat.css are loaded there as an
+-- extension (UI.Extend). The reports are normal fks-core screens (client/reports.lua).
 ---------------------------------------------------------------------------
-local uiReady = false
-local queue = {}
-
 function SendUI(action, data)
-    if not uiReady then
-        queue[#queue + 1] = { action = action, data = data }
-        return
-    end
-    SendNUIMessage({ action = action, data = data })
+    UI.ExtSend(action, data)
 end
 
--- frequent updates (3D positions): dropped instead of queued while the page loads
-function SendUILive(action, data)
-    if uiReady then SendNUIMessage({ action = action, data = data }) end
-end
+-- frequent updates (3D positions)
+SendUILive = SendUI
 
 ---------------------------------------------------------------------------
--- Focus: the chat and every panel use mouse + keyboard. The page calls "release" when the
--- last thing open is closed.
+-- Focus: the chat input and the settings card take mouse + keyboard; the page gives it back
+-- (api.focus(false)) when the last of them closes.
 ---------------------------------------------------------------------------
 local focused = false
 
 function SetFocus(on)
     focused = on
-    SetNuiFocus(on, on)
+    UI.ExtFocus(on)
 end
 
 function IsFocused() return focused end
-
--- opens a panel of the page (report, reports, settings)
-function OpenPanel(action, data)
-    SetFocus(true)
-    SendUI(action, data)
-end
-
-RegisterNUICallback('release', function(_, cb)
-    SetFocus(false)
-    cb('ok')
-end)
 
 ---------------------------------------------------------------------------
 -- Settings of the player (saved on their PC)
@@ -53,33 +34,41 @@ local function LoadSettings()
     return ok and type(data) == 'table' and data or nil
 end
 
-RegisterNUICallback('settings:save', function(data, cb)
+UI.OnExt('settings:save', function(data)
     if type(data) == 'table' then SetResourceKvp(KVP, json.encode(data)) end
-    cb('ok')
 end)
 
 RegisterNetEvent('fks-chat:client:settings', function()
-    OpenPanel('settings:open')
+    SetFocus(true)
+    SendUI('settings:open')
 end)
 
-RegisterNUICallback('ready', function(_, cb)
-    uiReady = true
-    SendNUIMessage({
-        action = 'init',
-        data = {
-            locale = LocaleUI,
-            defaults = Config.Defaults,
-            settings = LoadSettings(),
-            showIds = Config.Chat.showIds,
-            maxLength = Config.Chat.maxLength,
-            reports = { subjectMax = Config.Reports.subjectMax, infoMax = Config.Reports.infoMax, messageMax = Config.Reports.messageMax },
-            maxBubbles = Config.ThreeD.maxPerPlayer,
-        },
+---------------------------------------------------------------------------
+-- Loading into the fks-core NUI
+---------------------------------------------------------------------------
+local function Start()
+    UI.Extend({ js = 'ui/chat.js', css = 'ui/chat.css' })
+    SendUI('init', {
+        locale = LocaleUI,
+        defaults = Config.Defaults,
+        settings = LoadSettings(),
+        showIds = Config.Chat.showIds,
+        maxLength = Config.Chat.maxLength,
+        maxBubbles = Config.ThreeD.maxPerPlayer,
     })
-    for _, msg in ipairs(queue) do SendNUIMessage(msg) end
-    queue = {}
     TriggerServerEvent('fks-chat:server:init')
-    cb('ok')
+end
+
+CreateThread(Start)
+
+-- fks-core restarted: the bridge loads the extension again, the chat needs its settings and suggestions back
+UI.OnExt('restart', function()
+    focused = false
+    SendUI('init', {
+        locale = LocaleUI, defaults = Config.Defaults, settings = LoadSettings(),
+        showIds = Config.Chat.showIds, maxLength = Config.Chat.maxLength, maxBubbles = Config.ThreeD.maxPerPlayer,
+    })
+    TriggerServerEvent('fks-chat:server:init')
 end)
 
 ---------------------------------------------------------------------------
@@ -91,7 +80,8 @@ CreateThread(function()
         Wait(0)
         if not focused then
             DisableControlAction(0, key, true)
-            if IsDisabledControlJustReleased(0, key) and not IsPauseMenuActive() then
+            -- not on top of another FKS screen (stable, character creator...)
+            if IsDisabledControlJustReleased(0, key) and not IsPauseMenuActive() and not UI.HasFocus() then
                 SetFocus(true)
                 SendUI('chat:open')
             end
@@ -99,8 +89,10 @@ CreateThread(function()
     end
 end)
 
-RegisterNUICallback('chat:submit', function(data, cb)
-    cb('ok')
+-- the page closed the chat / settings with ESC
+UI.OnExt('release', function() SetFocus(false) end)
+
+UI.OnExt('submit', function(data)
     SetFocus(false) -- before running the command: a command may open a panel
     local text = type(data) == 'table' and type(data.text) == 'string' and data.text or ''
     text = text:gsub('^%s+', ''):gsub('%s+$', '')
@@ -120,7 +112,7 @@ CreateThread(function()
         local h = IsPauseMenuActive()
         if h ~= hidden then
             hidden = h
-            SendUI('chat:hide', h)
+            SendUI('chat:hide', { on = h })
         end
     end
 end)
@@ -161,7 +153,7 @@ RegisterNetEvent('chat:addSuggestions', function(list)
 end)
 
 RegisterNetEvent('chat:removeSuggestion', function(name)
-    SendUI('chat:removeSuggestion', name)
+    SendUI('chat:removeSuggestion', { name = name })
 end)
 
 -- from the server (fks-chat commands + server commands this player may use) + the commands of this client
@@ -172,14 +164,10 @@ RegisterNetEvent('fks-chat:client:suggestions', function(list)
             list[#list + 1] = { name = '/' .. c.name, help = '' }
         end
     end
-    SendUI('chat:suggestions', list)
+    SendUI('chat:suggestions', { list = list })
 end)
 
 -- the admin group is only known once the character is loaded
 Bridge.OnLoaded(function()
-    if uiReady then TriggerServerEvent('fks-chat:server:init') end
-end)
-
-AddEventHandler('onResourceStop', function(res)
-    if res == GetCurrentResourceName() and focused then SetNuiFocus(false, false) end
+    TriggerServerEvent('fks-chat:server:init')
 end)
